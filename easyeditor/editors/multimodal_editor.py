@@ -384,18 +384,26 @@ class MultimodalEditor:
                 if 'locality_output' in metrics['post'].keys():
                     assert len(metrics['post']['locality_output']) == \
                             len(metrics['pre']['locality_output'])
-                    base_logits = torch.tensor(metrics['pre']['locality_output']).to(torch.float32)
-                    post_logits = torch.tensor(metrics['post']['locality_output']).to(torch.float32)
-                    metrics['post']['locality_acc'] = sum(post_logits.view(-1) == base_logits.view(-1))/base_logits.view(-1).shape[0]
+                    base = metrics['pre']['locality_output']
+                    post = metrics['post']['locality_output']
+
+                    base = torch.as_tensor(base, dtype=torch.float32)
+                    post = torch.as_tensor(post, dtype=torch.float32)
+
+                    metrics['post']['locality_acc'] = (base == post).float().mean().item()
                     metrics['post'].pop('locality_output')
                     metrics['pre'].pop('locality_output')
                     
                 if 'multimodal_locality_output' in metrics['post'].keys():
                     assert len(metrics['post']['multimodal_locality_output']) == \
                             len(metrics['pre']['multimodal_locality_output'])
-                    base_image_logits = torch.tensor(metrics['pre']['multimodal_locality_output']).to(torch.float32)
-                    post_image_logits = torch.tensor(metrics['post']['multimodal_locality_output']).to(torch.float32)
-                    metrics['post']['multimodal_locality_acc'] = sum(post_image_logits.view(-1) == base_image_logits.view(-1))/post_image_logits.view(-1).shape[0]
+                    base = metrics['pre']['multimodal_locality_output']
+                    post = metrics['post']['multimodal_locality_output']
+
+                    base = torch.as_tensor(base, dtype=torch.float32)
+                    post = torch.as_tensor(post, dtype=torch.float32)
+
+                    metrics['post']['multimodal_locality_acc'] = (base == post).float().mean().item()
                     metrics['post'].pop('multimodal_locality_output')
                     metrics['pre'].pop('multimodal_locality_output')
 
