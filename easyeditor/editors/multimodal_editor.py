@@ -20,7 +20,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from transformers import LlamaTokenizer, LlamaForCausalLM
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 from transformers import GPT2TokenizerFast, GPT2Tokenizer
-from transformers import AutoProcessor, LlavaOnevisionForConditionalGeneration, Qwen2VLForConditionalGeneration
+from transformers import AutoProcessor, LlavaOnevisionForConditionalGeneration, Qwen2VLForConditionalGeneration, LlavaForConditionalGeneration, LlavaImageProcessor
 
 from ..util.globals import *
 from .batch_editor import BatchEditor
@@ -44,6 +44,10 @@ def make_logs():
     LOG.addHandler(f_h)
     LOG.addHandler(s_h)
 
+class IdentityVisionTokenizer:
+    def __call__(self, image, file_type=None):
+        # LLaVA processor expects RAW images
+        return image
 
 class MultimodalEditor:
     """Multimodal editor for all methods"""
@@ -158,7 +162,18 @@ class MultimodalEditor:
                 self.vis_tok = Qwen2VLProcessor()
                 self.tok = AutoProcessor.from_pretrained(hparams.model_name)
                 self.model_name = "qwen2-vl"
-                
+            elif "llava-1.5" in hparams.model_name.lower():
+                if not hasattr(hparams, 'dtype'):
+                    hparams.dtype = torch.float32
+                self.model = LlavaForConditionalGeneration.from_pretrained(
+                    hparams.model_name,
+                    torch_dtype=hparams.dtype,
+                    # attn_implementation="flash_attention_2" 
+                )
+                self.vis_tok = IdentityVisionTokenizer()
+                image_processor = LlavaImageProcessor.from_pretrained(hparams.model_name, do_pad=True)
+                self.tok = AutoProcessor.from_pretrained(hparams.model_name, vision_processor_class=image_processor)
+                self.model_name = "llava-1.5"    
         else:
             self.model, self.tok = self.model_name
             
@@ -267,7 +282,7 @@ class MultimodalEditor:
                             "pre": compute_multimodal_edit_results(self.model, self.model_name, self.hparams, self.tok,
                                                                 request, self.hparams.device)
                         }
-                    elif self.model_name in ['llava-onevision', 'qwen2-vl']:
+                    elif self.model_name in ['llava-onevision', 'qwen2-vl', 'llava-1.5']:
                         metrics = {
                             'case_nums': i,
                             "time": exec_time,
@@ -369,7 +384,7 @@ class MultimodalEditor:
                             "pre": compute_multimodal_edit_results(self.model, self.model_name, self.hparams, self.tok,
                                                                 request, self.hparams.device)
                         }
-                    elif self.model_name in ['llava-onevision', 'qwen2-vl']:
+                    elif self.model_name in ['llava-onevision', 'qwen2-vl', 'llava-1.5']:
                         metrics = {
                             'case_id': i,
                             # "requested_rewrite": request,
@@ -458,7 +473,7 @@ class MultimodalEditor:
                 if self.model_name in ['minigpt4', 'blip2']:
                     pre_res = compute_multimodal_edit_results(self.model, self.model_name, self.hparams, self.tok,
                                                             request, self.hparams.device)
-                elif self.model_name in ['llava-onevision', 'qwen2-vl']:
+                elif self.model_name in ['llava-onevision', 'qwen2-vl', 'llava-1.5']:
                     pre_res = compute_multimodal_hf_edit_results(self.model, self.model_name, self.hparams, self.tok,
                                                             request, self.hparams.device)
                 edited_model, weights_copy = self.apply_algo(
@@ -492,7 +507,7 @@ class MultimodalEditor:
                                                             request, self.hparams.device),
                         "pre": pre_res
                     }
-                elif self.model_name in ['llava-onevision', 'qwen2-vl']:
+                elif self.model_name in ['llava-onevision', 'qwen2-vl', 'llava-1.5']:
                     metrics = {
                         'case_id': i,
                         # "requested_rewrite": request,
